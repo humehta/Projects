@@ -1,0 +1,473 @@
+---
+title: "Mini Project 1"
+author: "Khushal Giri, Vaishnavi Srinivasan, Ayesha Bhimdiwala and Harsh Mehta"
+date: "2/1/2018"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE)
+```
+
+```{r}
+library(gapminder)
+library(ggplot2)
+library(tidyr)
+library(broom)
+library(gridExtra)
+library(GGally)
+```
+
+#Introduction:
+
+Gapminder Foundation (Gapminder.org) is a non-profit venture that promotes sustainable global development and achievement of the United Nations Millennium Development Goals. It uses statistics and social, economic and environmental development information  at local, national and global levels. [Source: [Wikipedia](https://en.wikipedia.org/wiki/Gapminder_Foundation)]
+
+Gapminder package contains values for life expectancy, GDP per capita, and population, every five years, from 1952 to 2007 for each of 142 countries from five continents. [Source: [CRAN.R](https://cran.r-project.org/web/packages/gapminder/index.html)]
+
+We will be addressing the question -  
+
+#Does increase in life expectancy since World War 2 be largely explained by increases in GDP per capita?
+
+To validate if such a relationship exists, we focus on performing data analysis on the explanatory variables using three questions.
+
+# Question 1: GDP and life expectancy in 2007
+
+We begin the analysis by looking at trend between GDP and life expectancy in 2007 for all continents.
+
+```{r}
+s = subset(gapminder,year=="2007")
+conasia=subset(s,continent=='Asia')
+coneurope=subset(s,continent=='Europe')
+conafrica=subset(s,continent=='Africa')
+conamericas=subset(s,continent=='Americas')
+conoceania=subset(s,continent=='Oceania')
+
+#Linear Model Fit for the Continents
+cont.lm = ggplot(s,aes(x=gdpPercap,y = lifeExp)) + geom_point() + geom_smooth(method="lm")+facet_wrap(~continent,ncol=2,scales = "free")+ggtitle("Linear Model Fit for the GDP vs LifeExpectancy for Continents")+ 
+   labs(x = 'GDP per Capita', y = 'Life Expectancy', title = 'Linear Model - Life Expectancy vs GDP per Capita in 2007')
+```
+
+From the linear model graphs (attached in Appendix), we found that it doesn't capture the trend of GDP per Capita and Life Expectancy for all the continents. For example, most of the African countries have a GDP of less than 2500\$ and quite less with GDP greater than 2500\$.
+
+Let us try using loess, a nonparametric method, that fits a smooth line through a timeplot or scatter plot to help asses the relationship between variables and foresee trends. It is used when we have noisy data, sparse data points or weak interrelationships that interfere with fitting a line of best fit. We will also be transforming the data to see if it performs a better fit.
+
+From the graphs, with respect to GDP and life expectancy in 2007, we can see that:
+
+- Africa has a linear increse with more countries having lower GDP and lower life expectancy and few countries with high GDP and life expectancy.
+
+- America's and Europe are best described by a loess curve, with most countries having GDP and life expectancy centered around 75. America has few countries and Europe has a higher number of countries with high GDP, high life expectancy.
+
+- Asia is also best described by a loess curve, with countries being spread out on the curve. It has countries with low, medium and high GDP and life expectancy (.i.e) it has a linear increase.
+
+- We did not consider Oceania as it has only two data points and it was not possible to fit any models for that continent.
+
+Even though we find linear relationship between GDP and life expectancy, there a number of additional parameters to be considered for estimating life expectancy like health-care available, social factors, etc.
+
+Looking at the "Life Expectancy vs GDP 2007" graph (next page), we can see that life expectancy is incresing as GDP is increasing in each country of the continent. We can see that all the countries have an additive shift - the lines are parallel to one another with different centers.
+
+```{r}
+#Checking Linear Model for Africa. We choose loess with span = 0.5
+
+afrigg = ggplot(conafrica, aes(x=log10(gdpPercap),y = lifeExp)) + geom_point() + geom_smooth(method = lm)+facet_wrap(~continent,ncol=2,scales = "free")+labs(x = 'Log transformed GDP per Capita', y = 'Life Expectancy', title = 'Linear Model - Africa')
+
+conafrica.lm = lm(lifeExp~log10(gdpPercap), data = conafrica)
+conafrica.lm.df = augment(conafrica.lm)
+
+#variance 
+```
+
+```{r}
+#Checking Linear Model for Americas
+
+amergg = ggplot(conamericas, aes(x=log10(gdpPercap),y = lifeExp)) + geom_point() + geom_smooth()+facet_wrap(~continent,ncol=2,scales = "free")+labs(x = 'Log transformed GDP per Capita', y = 'Life Expectancy', title = 'Americas')
+
+conamericas.lo = loess(lifeExp~log10(gdpPercap), data = conamericas)
+conamericas.lo.df = augment(conamericas.lo)
+```
+
+```{r}
+#Checking Linear Model for Asia. We choose loess because of the blue line around the zero line and data is within C.I. for fitted and residual plot
+
+asiagg = ggplot(conasia, aes(x=log10(gdpPercap),y = lifeExp)) + geom_point() + geom_smooth()+facet_wrap(~continent,ncol=2,scales = "free")+labs(x = 'Log transformed GDP per Capita', y = 'Life Expectancy', title = 'Loess Curve - Asia')
+
+conasia.lo = loess(lifeExp~log10(gdpPercap), data = conasia)
+conasia.lo.df = augment(conasia.lo)
+```
+
+```{r}
+
+#Checking Linear Model for Europe
+
+eurogg = ggplot(coneurope, aes(x=log10(gdpPercap),y = lifeExp)) + geom_point() + geom_smooth()+facet_wrap(~continent,ncol=2,scales = "free")+labs(x = 'Log transformed GDP per Capita', y = 'Life Expectancy', title = 'Loess Curve - Europe')
+
+coneurope.lo = loess(lifeExp~log10(gdpPercap), data = coneurope)
+coneurope.lo.df = augment(coneurope.lo)
+```
+
+```{r}
+grid.arrange(afrigg, amergg, asiagg, eurogg, top = "Log10(GDP) vs LifeExpectancy for each continent")
+
+cat("The model captures ", var(conafrica.lm.df$.fitted)/var(conafrica$lifeExp)*100,"% of variance in the data for Africa in 2007.")
+cat("\nThe model captures ", var(conamericas.lo.df$.fitted)/var(conamericas$lifeExp)*100,"% of variance in the data for Americas in 2007.")
+cat("\nThe model captures ", var(conasia.lo.df$.fitted)/var(conasia$lifeExp)*100,"% of variance in the data for Asia in 2007.")
+cat("\nThe model captures ", var(coneurope.lo.df$.fitted)/var(coneurope$lifeExp)*100,"% of variance in the data for Europe in 2007.")
+
+rm(afrigg, amergg, asiagg, eurogg)
+```
+
+```{r}
+cont07gg = ggplot(s,aes(x=log(gdpPercap),y=lifeExp,group = continent,color=continent)) + geom_point(alpha=.3) + geom_smooth(method="lm",alpha=.1)+ labs(x = 'Log of GDP per Capita', y = 'Life Expectancy', title = 'Life Expectancy vs GDP - 2007')
+
+continent.asia=subset(gapminder,continent=='Asia')
+continent.europe=subset(gapminder,continent=='Europe')
+continent.africa=subset(gapminder,continent=='Africa')
+continent.america=subset(gapminder,continent=='Americas')
+continent.oceania=subset(gapminder,continent=='Oceania')
+
+lifeExp.time.asia=c()
+lifeExp.time.africa=c()
+lifeExp.time.america=c()
+lifeExp.time.europe=c()
+lifeExp.time.oceania=c()
+year=c(1952,1957,1962,1967,1972,1977,1982,1987,1992,1997,2002,2007)
+
+j=1
+for(i in year){
+  lifeExp.time.asia[j]=weighted.mean(continent.asia$lifeExp[continent.asia$year==i],continent.asia$pop[continent.asia$year==i])  
+  lifeExp.time.africa[j]=weighted.mean(continent.africa$lifeExp[continent.africa$year==i],continent.africa$pop[continent.africa$year==i])  
+  lifeExp.time.america[j]=weighted.mean(continent.america$lifeExp[continent.america$year==i],continent.america$pop[continent.america$year==i])  
+  lifeExp.time.europe[j]=weighted.mean(continent.europe$lifeExp[continent.europe$year==i],continent.europe$pop[continent.europe$year==i])  
+  lifeExp.time.oceania[j]=weighted.mean(continent.oceania$lifeExp[continent.oceania$year==i],continent.oceania$pop[continent.oceania$year==i])  
+  j=j+1
+}
+
+continent.weight=data.frame(year,lifeExp.time.africa,lifeExp.time.america,lifeExp.time.asia,lifeExp.time.europe,lifeExp.time.oceania)
+names(continent.weight)=c('year','Africa','America','Asia','Europe','Oceania')
+
+continent.weight.long=continent.weight %>% gather(Continent,AvgLifeExp,Africa:Oceania)
+
+contgg = ggplot(continent.weight.long,aes(x=year,y=AvgLifeExp,group = Continent,color=Continent))+geom_point()+geom_line()+ylab('Average Life Expectancy (in years)')+xlab('Year')+ggtitle('Life Expectancy Over Time')#+geom_smooth(method.args=list(degree=1))
+
+grid.arrange(cont07gg, contgg, ncol=2, heights=c(3,1))
+
+rm(s, conasia, coneurope, conafrica, conamericas, conoceania, cont07gg, contgg)
+```
+
+#Question 2: Life expectancy over time by continent
+
+For looking at life expectancy over time by each continent, we first begin by calculating the weighted average life expectancy per continent over the years. Then, we use this data for plotting the average life expectancy against each year.
+
+By observing the "Life Expectancy Over Time" graph (above), we deduce that average life expectancy increases linearly over the years for all the continents - with Ocenia having the highest and African countries having the lowest average life expectancy across all years.
+
+It is clear that Oceania, Europe and America have a head start with higher life expectancy from early years and it increases linearly.
+
+Asia, with life expectancy at around 40 in 1950's has the fastest growth rate catching upto Oceania, Europe and Americas. Intially Asia started at an average 18 years gap and finally reducing the gap to an average 5 years, having it's ups and downs.
+
+Africa has the slowest growth rate with average life expectancy starting below 40 and reaching 55 near 2007. Even though the growth is linear till 1990's, it starts flattening out till 2007.
+
+The small discrepancy over they years for some of the continents below for each continent. We use "\<Continent_Name\> - Trend" graphs to display the top 5 countries with maximum population in each continent and how they affect the overall trend.
+
+```{r}
+asia.subset=subset(continent.asia,continent=='Asia' & (country=="India" |
+                                                       country=="China" |
+                                                       country=="Japan" |
+                                                       country=="Bangladesh" |
+                                                       country=="Indonesia"),stringsAsFactors=FALSE)
+asia.subset$country <- as.character(asia.subset$country)
+for (i in year){
+  apop = sum(as.numeric(continent.asia$pop[continent.asia$year==i &
+                                                       continent.asia$country!="India" &
+                                                       continent.asia$country!="China" &
+                                                       continent.asia$country!="Japan" &
+                                                       continent.asia$country!="Bagladesh" &
+                                                       continent.asia$country!="Indonesia"]))
+  agdpPerCap = mean(as.numeric(continent.asia$gdpPercap[continent.asia$year==i &
+                                                       continent.asia$country!="India" &
+                                                       continent.asia$country!="China" &
+                                                       continent.asia$country!="Japan" &
+                                                       continent.asia$country!="Bagladesh" &
+                                                       continent.asia$country!="Indonesia"]))
+  alifeExp = mean(as.numeric(continent.asia$lifeExp[continent.asia$year==i &
+                                                       continent.asia$country!="India" &
+                                                       continent.asia$country!="China" &
+                                                       continent.asia$country!="Japan" &
+                                                       continent.asia$country!="Bagladesh" &
+                                                       continent.asia$country!="Indonesia"]))
+  asia.subset[nrow(asia.subset) + 1,] = list("Others", "Asia", i, alifeExp, apop, agdpPerCap)
+}
+
+asiagg = ggplot(asia.subset,aes(x=year,y=lifeExp,group = country,color=country))+geom_point()+geom_line()+ylab('Avg. Life Expectancy')+xlab('Year')+ggtitle('Asia - Trend')+scale_colour_brewer(palette = "Dark2")+theme(axis.text=element_text(size=8),legend.text=element_text(size=8),legend.key.height = unit(.25,"cm"))
+
+rm(asia.subset)
+```
+
+```{r}
+africa.subset=subset(continent.africa,continent=='Africa' & (country=="South Africa" |
+                                                       country=="Egypt" |
+                                                       country=="Nigeria" |
+                                                       country=="Congo, Dem. Rep." |
+                                                       country=="Ethiopia"))
+africa.subset$country <- as.character(africa.subset$country)
+for (i in year){
+  apop = sum(as.numeric(continent.africa$pop[continent.africa$year==i &
+                                                       continent.africa$country!="South Africa" &
+                                                       continent.africa$country!="Egypt" &
+                                                       continent.africa$country!="Nigeria" &
+                                                       continent.africa$country!="Congo, Dem. Rep." &
+                                                       continent.africa$country!="Ethiopia"]))
+  agdpPerCap = mean(as.numeric(continent.africa$gdpPercap[continent.africa$year==i &
+                                                       continent.africa$country!="South Africa" &
+                                                       continent.africa$country!="Egypt" &
+                                                       continent.africa$country!="Nigeria" &
+                                                       continent.africa$country!="Congo, Dem. Rep." &
+                                                       continent.africa$country!="Ethiopia"]))
+  alifeExp = mean(as.numeric(continent.africa$lifeExp[continent.africa$year==i &
+                                                       continent.africa$country!="South Africa" &
+                                                       continent.africa$country!="Egypt" &
+                                                       continent.africa$country!="Nigeria" &
+                                                       continent.africa$country!="Congo, Dem. Rep." &
+                                                       continent.africa$country!="Ethiopia"]))
+  africa.subset[nrow(africa.subset) + 1,] = list("Others", "africa", i, alifeExp, apop, agdpPerCap)
+}
+
+africagg = ggplot(africa.subset,aes(x=year,y=lifeExp,group = country,color=country))+geom_point()+geom_line()+ylab('Avg. Life Expectancy')+xlab('Year')+ggtitle('Africa - Trend')+scale_colour_brewer(palette = "Dark2")+theme(axis.text=element_text(size=8),legend.text=element_text(size=8),legend.key.height = unit(.25,"cm"))
+
+rm(africa.subset)
+```
+
+```{r}
+americas.subset=subset(continent.america,continent=='Americas' & (country=="United States" |
+                                                       country=="Brazil" |
+                                                       country=="Argentina" |
+                                                       country=="Mexico" |
+                                                       country=="Canada"))
+americas.subset$country <- as.character(americas.subset$country)
+for (i in year){
+  apop = sum(as.numeric(continent.america$pop[continent.america$year==i &
+                                                       continent.america$country!="United States" &
+                                                       continent.america$country!="Brazil" &
+                                                       continent.america$country!="Argentina" &
+                                                       continent.america$country!="Mexico" &
+                                                       continent.america$country!="Canada"]))
+  agdpPerCap = mean(as.numeric(continent.america$gdpPercap[continent.america$year==i &
+                                                       continent.america$country!="United States" &
+                                                       continent.america$country!="Brazil" &
+                                                       continent.america$country!="Argentina" &
+                                                       continent.america$country!="Mexico" &
+                                                       continent.america$country!="Canada"]))
+  alifeExp = mean(as.numeric(continent.america$lifeExp[continent.america$year==i &
+                                                       continent.america$country!="United States" &
+                                                       continent.america$country!="Brazil" &
+                                                       continent.america$country!="Argentina" &
+                                                       continent.america$country!="Mexico" &
+                                                       continent.america$country!="Canada"]))
+  americas.subset[nrow(americas.subset) + 1,] = list("Other", "Americas", i, alifeExp, apop, agdpPerCap)
+}
+
+americasgg = ggplot(americas.subset,aes(x=year,y=lifeExp,group = country,color=country))+geom_point()+geom_line()+ylab('Avg. Life Expectancy')+xlab('Year')+ggtitle('Americas - Trend')+scale_colour_brewer(palette = "Dark2")+theme(axis.text=element_text(size=8),legend.text=element_text(size=8),legend.key.height = unit(.25,"cm"))
+
+rm(americas.subset)
+```
+
+```{r}
+europe.subset=subset(continent.europe,continent=='Europe' & (country=="United Kingdom" |
+                                                       country=="Turkey" |
+                                                       country=="France" |
+                                                       country=="Germany" |
+                                                       country=="Poland"))
+europe.subset$country <- as.character(europe.subset$country)
+for (i in year){
+  apop = sum(as.numeric(continent.europe$pop[continent.europe$year==i &
+                                                       continent.europe$country!="United Kingdom" &
+                                                       continent.europe$country!="Turkey" &
+                                                       continent.europe$country!="France" &
+                                                       continent.europe$country!="Germany" &
+                                                       continent.europe$country!="Poland"]))
+  agdpPerCap = mean(as.numeric(continent.europe$gdpPercap[continent.europe$year==i &
+                                                       continent.europe$country!="United Kingdom" &
+                                                       continent.europe$country!="Turkey" &
+                                                       continent.europe$country!="France" &
+                                                       continent.europe$country!="Germany" &
+                                                       continent.europe$country!="Poland"]))
+  alifeExp = mean(as.numeric(continent.europe$lifeExp[continent.europe$year==i &
+                                                       continent.europe$country!="United Kingdom" &
+                                                       continent.europe$country!="Turkey" &
+                                                       continent.europe$country!="France" &
+                                                       continent.europe$country!="Germany" &
+                                                       continent.europe$country!="Poland"]))
+  europe.subset[nrow(europe.subset) + 1,] = list("Other", "europe", i, alifeExp, apop, agdpPerCap)
+}
+
+europegg = ggplot(europe.subset,aes(x=year,y=lifeExp,group = country,color=country))+geom_point()+geom_line()+ylab('Avg. Life Expectancy')+xlab('Year')+ggtitle('Europe - Trend')+scale_colour_brewer(palette = "Dark2")+theme(axis.text=element_text(size=8),legend.text=element_text(size=8),legend.key.height = unit(.25,"cm"))
+
+rm(europe.subset)
+
+oceaniagg = ggplot(continent.oceania,aes(x=year,y=lifeExp,group = country,color=country))+geom_point()+geom_line()+ylab('Avg. Life Expectancy')+xlab('Year')+ggtitle('Oceania - Trend')+scale_colour_brewer(palette = "Dark2")+theme(axis.text=element_text(size=8),legend.text=element_text(size=8),legend.key.height = unit(.25,"cm"))
+
+grid.arrange(asiagg,africagg,americasgg, europegg, oceaniagg, ncol=2)
+rm(asiagg,africagg,americasgg, europegg, oceaniagg)
+rm(lifeExp.time.asia, lifeExp.time.africa, lifeExp.time.america, lifeExp.time.europe, lifeExp.time.oceania, year, continent.weight, continent.weight.long)
+```
+
+###Oceania 
+
+- There is a steady growth till 1975 after which the growth is faster.  
+
+###Americas
+
+- United States and Canada have the highest population with very high average life expectancy (between 70 to 80 years).
+
+- Brazil, Mexico and Argentina are the next highly populated countries having a relatively lower life expectancy between 50 to 70.
+
+- The average value of these five countries put together represent the average life expectancy of Americas.  
+
+###Europe 
+
+- There is a very light dip in the life expectancy that starts around 1980. 
+
+- The fall of Soviet Union, which reduced the life expectancy of Eastern European countries (eg. Poland) around 1980's, due to poor economy and lack of good health care facilities. 
+
+- We also observe that even though there is an increase in the average life expectancy in Eastern European bloc, it is comparitively lower to central and western europe.  
+
+###Asia 
+
+- Since, India and China share approximately 60% of the population in Asia, most of the anomalies can be explained using them. 
+
+- There is a drop in average life expectancy between the years 1955 and 1965 in the "Life Expectancy Over Time" graph. This can be attributed to the below factors,
+    
+    + China and India had a life expectancy of around 40 during these years, bringing down the life expectancy of Asia to around 45, even though Japan has a average life expectancy of 65 and rest of the countries at around 52. 
+    
+    + China suffered from a great famine that had an estimate 30 million deaths and also reduced birth rate from 1955 till 1967 followed by steady growth in life expectancy starting from 1972. 
+    
+    + While India's life expectancy was linearly growing, it is still very low as compared to other countries in Asia. 
+    
+    + At 2007, we can see that India and China have a life expectancy at 60 and 68 respectively. Asia's life expectancy is also around 65's mimicing their growth.  
+
+###Africa 
+
+- Life expectancy is growing linearly till 1990 after which it flats out rather than increase. 
+
+- The are numerous reason, some of which are discribed below,
+
+    + AIDS and tuberculosis epidemic which hit South Africa,
+    
+    + It was estimated that South Africa has lost at least 17 years of average life expectancy to the AIDS epidemic by 2000-2005.
+    
+    + Younger age groups were affected by AIDS more and lost their lives quiet early (nearly a quarter million deaths were caused in Ethiopia and Nigeria.)
+    
+    + The neonatal death rate (due to poor healthcare facilities) was severly high in some African countries (South Africa, Nigeria).
+    
+    + Regional politics in Nigeria around 1990's also contributed to higher percentage of deaths, bringing down Africa's life expectancy.
+
+#Question 3: Changes in the relationship between GDP and life expectancy over time
+
+We start analysing the data by looking at the trend between GDP (transformed using log) and life expectancy for each continent. And then, plotting GDP (transformed using log) and life expectancy over time per continent.
+
+The life expectancy per continent is increasing linealy as GDP increases. This can mean that as countries gain more money, they were investing in better health care facilities, better infrastructure, etc that promotes good health and in turn higher life expectancy.
+
+By looking through time, GDP and life expectancy also linearly increase. An interesting information to note is that even though all continents had a wide gap between life expectancy in the initial years(1952), over time (from 1993) they are racing to catch upto each other. America has the steepest rise, with Asia and Europe having a normal rise. Asia has the widest rise from a very low GDP and life expectancy to very high values. Africa being the only continent to show a very slow minimal rise both in terms of GDP and life expectancy. But we also need to note that there is a wider standard deviation towards the ends, especially in Asia, though over the years it tends to reduce.
+
+```{r}
+plot1 = ggplot(gapminder,aes(x = log10(gdpPercap), y = lifeExp, group = continent, color = continent))+ theme(strip.text.y = element_text(angle = 0))+geom_smooth(method=lm)+ labs(x = 'Log of GDP per Capita', y = 'Life Expectancy', title = 'Life Expectancy vs GDP')
+
+plot2 = ggplot(gapminder,aes(x = log10(gdpPercap), y = lifeExp, group = continent, color = continent))+facet_wrap(~cut_number(as.numeric(year),n = 12), ncol = 3) +   theme(strip.text.y = element_text(angle = 0))+geom_smooth(method=lm, alpha=0.2)+ labs(x = 'Log of GDP per Capita', y = 'Life Expectancy', title = 'Life Expectancy vs GDP per Year')
+
+grid.arrange(plot1, plot2, ncol=2, heights=c(250), widths=c(15,20))
+
+rm(plot1, plot2)
+```
+
+#CONCLUSION
+
+Even though looking at the graphs we can say that over time as GDP increases so does life expectancy, but it would be unwise to arrive at such a conclusion. Based on standard deviation bands, we can see that different countries have different life expectancy even though they have nearly the same GDP. Also to note are endogenuos factors such as reginal politics, natural disasters and epidemics and how they would have disabled a nations progress, such as Africa. Africa, even though holds a majority of the worlds natural resources (30% of the earth's mineral resources), and is considered as the world's 10 fastest-growing economies, has the slowest growth rate in terms of GDP and life expectancy.
+
+##REFERENCES
+
+- http://www.pilibrary.com/articles1/political%20experiences%20in%20nigeria.htm
+
+- http://www.aljazeera.com/indepth/interactive/2016/10/mapping-africa-natural-resources-161020075811145.html
+
+- https://www.un.org/press/en/2001/aids18.doc.htm
+
+- http://www.who.int/gho/mortality_burden_disease/life_tables/situation_trends_text/en/
+
+- https://www.iol.co.za/news/south-africa/western-cape/four-reasons-for-sas-low-life-expectancy-1798106
+
+- http://www.who.int/gho/mortality_burden_disease/life_tables/situation_trends_text/en/
+
+- https://en.wikipedia.org/wiki/Great_Leap_Forward#Famine_deaths
+
+- http://www.statisticshowto.com/lowess-smoothing/
+
+##APPENDIX
+
+```{r}
+grid.arrange(cont.lm)
+
+conafrlm=ggplot(conafrica.lm.df,aes(x = log10.gdpPercap., y = .resid))+ geom_point()+ geom_smooth(span=0.5)+geom_abline(slope = 0, intercept = 0)
+africafr.lm = ggplot(conafrica.lm.df,aes(x =.fitted, y = sqrt(abs(.resid))))+ geom_point()+ geom_smooth()
+grid.arrange(conafrlm, africafr.lm, ncol=2, top="Africa -  Residual Plot & Fitted vs Residual Plot")
+
+rm(conafrlm, conafrica.lm.df, conafrica.lm, africafr.lm)
+
+conamrlo=ggplot(conamericas.lo.df,aes(x = log10.gdpPercap., y = .resid))+ geom_point()+ geom_smooth()+geom_abline(slope = 0, intercept = 0)
+americas.lo = ggplot(conamericas.lo.df,aes(x =.fitted, y = sqrt(abs(.resid))))+ geom_point()+ geom_smooth()+geom_abline(slope = 0, intercept = 0)
+
+grid.arrange(conamrlo,americas.lo, ncol=2, top="Americas -  Residual Plot & Fitted vs Residual Plot")
+
+rm(conamericas.lo, conamericas.lo.df, conamrlo, americas.lo)
+
+conasalo=ggplot(conasia.lo.df,aes(x = log10.gdpPercap., y = .resid))+ geom_point()+ geom_smooth()+geom_abline(slope = 0, intercept = 0)
+
+asiafr.lo = ggplot(conasia.lo.df,aes(x =.fitted, y = .resid))+ geom_point()+ geom_smooth()+geom_abline(slope = 0, intercept = 0)
+
+grid.arrange(conasalo, asiafr.lo, ncol=2, top="Asia -  Residual Plot & Fitted vs Residual Plot")
+
+rm(conasia.lo, conasia.lo.df, conasalo, asiafr.lo)
+
+coneurlo=ggplot(coneurope.lo.df,aes(x = log10.gdpPercap., y = .resid))+ geom_point()+ geom_smooth()+geom_abline(slope = 0, intercept = 0)
+
+eurofr.lo = ggplot(coneurope.lo.df,aes(x =.fitted, y = sqrt(abs(.resid))))+ geom_point()+ geom_smooth()+geom_abline(slope = 0, intercept = 0)
+grid.arrange(coneurlo, eurofr.lo, ncol=2, top="Europe -  Residual Plot & Fitted vs Residual Plot")
+
+rm(coneurope.lo, coneurope.lo.df, coneurlo, eurofr.lo)
+
+rm(cont.lm, conafrica.lm, conamericas.lo, conasia.lo, coneurope.lo, conafrica.lm.df, conamericas.lo.df, conasia.lo.df, coneurope.lo.df)
+```
+
+Correlation between GDP, Life Expactancy, Time and Population per Continent.
+
+###Asia
+```{r}
+ggpairs(continent.asia, columns = 3:6)+ 
+  labs(title = 'Asia - Scatter Plot between GDP, Life Expactancy, Time and Population')
+```
+
+###Africa
+```{r}
+ggpairs(continent.africa, columns = 3:6)+ 
+  labs(title = 'Africa - Scatter Plot between GDP, Life Expactancy, Time and Population')
+```
+
+###Americas
+```{r}
+ggpairs(continent.america, columns = 3:6)+ 
+  labs(title = 'America - Scatter Plot between GDP, Life Expactancy, Time and Population')
+```
+
+###Europes
+```{r}
+ggpairs(continent.europe, columns = 3:6)+ 
+  labs(title = 'Europe - Scatter Plot between GDP, Life Expactancy, Time and Population')
+```
+
+
+###Oceania
+```{r}
+ggpairs(continent.oceania, columns = 3:6)+ 
+  labs(title = 'Oceania - Scatter Plot between GDP, Life Expactancy, Time and Population')
+rm(continent.asia,continent.europe,continent.africa,continent.america,continent.oceania)
+```
